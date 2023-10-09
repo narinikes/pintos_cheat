@@ -96,7 +96,17 @@ struct thread
    
    /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    
+
+   /* New members for Priority Scheduling */
+   int ori_priority;                /* Original Priority of Thread */
+   struct lock* waiting_lock;       /* Lock to Release this Thread */
+   struct list given_donations;     /* List of Threads which donate priority */
+   struct list_elem donation_elem;  /* To manage "given_donation" */
+
+   /* Advanced Scheduler */
+   int nice;
+   int recent_cpu;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -141,9 +151,30 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+void cmp_thread_priority_list(void);
+bool cmp_thread_priority(const struct list_elem *thread1, const struct list_elem *thread2, void *aux UNUSED);
+
+
+/* New Functions for Priority Donation */
+void donate_priority(void);
+void remove_lock(struct lock *lock);
+void priority_update(void);
+bool cmp_donated_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/* New Functions for MLFQS */
+void mlfqs_compute_priority(struct thread *thr);
+void mlfqs_compute_recent_cpu(struct thread *thr);
+void mlfqs_compute_load_avg(void);
+
+void mlfqs_increase_recent_cpu(void);
+void mlfqs_recompute_priority(void);
+void mlfqs_recompute_recent_cpu(void);
+
+
 
 #endif /* threads/thread.h */
