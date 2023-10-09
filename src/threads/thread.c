@@ -551,7 +551,7 @@ void mlfqs_recompute_priority(void)
     struct thread *thr = list_entry(node, struct thread, allelem);
     mlfqs_compute_priority(thr);
   }
-  //list_sort(&ready_list, cmp_thread_priority, NULL);
+  list_sort(&ready_list, cmp_thread_priority, NULL);
 }
 
 void mlfqs_recompute_recent_cpu(void)
