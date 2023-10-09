@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/fixed_point.h"
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -90,9 +92,11 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
-    /* Shared between thread.c and synch.c. */
+   int64_t remain;                       /* For Alarm Clock */
+   
+   /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-
+    
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -109,6 +113,10 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 void thread_start (void);
+
+/* New Functions for Alarm Clock*/
+void make_thread_sleep(int64_t ticks);
+void make_thread_wake(int64_t ticks);
 
 void thread_tick (void);
 void thread_print_stats (void);

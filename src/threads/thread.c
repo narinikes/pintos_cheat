@@ -24,6 +24,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* New list for Alarm Clock; Threads that are sleeping */
+static struct list slept_list;
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -98,6 +101,9 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  /* Initialize Slept_list */
+  list_init(&slept_list);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -115,6 +121,40 @@ thread_start (void)
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
+}
+
+
+/* New Functions for Alarm CLock */
+void
+make_thread_sleep(int64_t ticks)
+{
+  enum intr_level old_level = intr_disable();
+  struct thread *current_thread = thread_current();
+
+  current_thread->remain = ticks;
+
+  list_push_back(&slept_list, &current_thread->elem);
+  thread_block();
+
+  intr_set_level(old_level);
+}
+
+/* New Functions for Alarm CLock */
+void make_thread_wake(int64_t ticks)
+{
+  /* Check through sleeping threads */
+  struct list_elem *node = list_begin(&slept_list);
+
+  while (node != list_end(&slept_list))
+  {
+    struct thread *thr = list_entry(node, struct thread, elem);
+    if(thr->remain <= ticks)  {
+      /* Wake this one */
+      node = list_remove(node);
+      thread_unblock(thr);
+    }
+    else  node = list_next(node);
+  }
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -200,7 +240,6 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
   return tid;
 }
 
@@ -307,7 +346,7 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
+  if (cur != idle_thread)
     list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
