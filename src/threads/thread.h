@@ -30,7 +30,7 @@ struct file_fd
    int fd;
    struct file *f;
    struct list_elem fd_elem;
-}
+};
 
 /* A kernel thread or user process.
 
@@ -113,8 +113,6 @@ struct thread
     struct thread *parent;
     struct list children;
     struct list_elem children_elem;
-    struct semaphore wait_child;
-    struct semaphore load_thr;
     struct file *current_file;
 
     int stdin_cnt;
