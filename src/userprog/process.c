@@ -167,6 +167,22 @@ int process_wait(tid_t child_tid UNUSED)
   return exit_state;
 }
 
+/* Get child process */
+struct thread *get_child_process(int pid) {
+  struct thread *thr = thread_current();
+  struct list *child_list = &thr->children_list;
+  struct list_elem *thr_child = list_begin(child_list);
+
+  while (thr_child != list_end(child_list)) {
+    struct thread *cur_t = list_entry(thr_child, struct thread, child_elem);
+    if (cur_t->tid == pid) {
+      return cur_t;
+    }
+    thr_child = list_next(thr_child);
+  }
+  return NULL;
+}
+
 /* Free the current process's resources. */
 void process_exit(void)
 {
