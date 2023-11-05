@@ -176,7 +176,7 @@ struct thread *get_child_process(int pid)
 
   while (thr_child != list_end(child_list)) 
   {
-    struct thread *cur_t = list_entry(thr_child, struct thread, child_elem);
+    struct thread *cur_t = list_entry(thr_child, struct thread, children_elem);
     if (cur_t->tid == pid) 
     {
       return cur_t;
