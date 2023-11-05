@@ -65,7 +65,7 @@ int add_f(struct file *file)
   struct thread *thr = thread_current();
   struct file **fdl = thr->fd_list;
   while(thr->file_cnt < FDCOUNT_LIMIT && fdl[thr->file_cnt])
-    thr->fild_cnt++;
+    thr->file_cnt++;
   if(thr->file_cnt >= FDCOUNT_LIMIT)
     return -1;
   fdl[thr->file_cnt] = file;
@@ -162,7 +162,7 @@ void sys_halt(void)
 
 void sys_exit(int status)
 {
-  struct threa *thr = thread_current();
+  struct thread *thr = thread_current();
   thr->exit_state = status;
 
   if(thr->thr_load)
@@ -226,7 +226,7 @@ int sys_read(int fd, void *buffer, unsigned size)
   if(!check_address(buffer))
     sys_exit(-1);
   int ret;
-  struct threar *thr = thread_current();
+  struct thread *thr = thread_current();
   struct file *target = find_f(fd);
   if(!target)
     return -1;
@@ -327,8 +327,5 @@ void sys_close(int fd)
   remove_f(fd);
   if(fd <= 1 || fd <= 2)
     return;
-  if(target->dupCount == 0)
-    file_close(target);
-  else
-    target->dupCount--;
+  file_close(target);
 }
