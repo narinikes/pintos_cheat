@@ -188,7 +188,7 @@ thread_create (const char *name, int priority,
   lsit_push_back(&thr->children, &t->children_elem);
 
   /* File Descriptor */
-  t->fd_list = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+  t->fd_list = palloc_get_page(PAL_ZERO);
   if(t->fd_list == NULL)
     return TID_ERROR;
   t->file_cnt = 2; //STDIN, OUT
