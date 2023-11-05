@@ -13,7 +13,6 @@ static void syscall_handler (struct intr_frame *);
 
 struct lock file_rw_lock;
 typedef int pid_t;
-#define FDCOUNT_LIMIT 16
 
 /* Functions for each system call */
 void sys_halt(void);

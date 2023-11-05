@@ -156,7 +156,15 @@ start_process(void *file_name_)
    does nothing. */
 int process_wait(tid_t child_tid UNUSED)
 {
-  return -1;
+  struct thread *child = get_child_with_pid(child_tid);
+  if(child == NULL)
+    return -1;
+  seam_down(&child->wait_sema);
+
+  int exit_state = child->exit_state;
+  list_remove(&child->children_elem);
+  sema_up(&child->free_sema);
+  return exit_state;
 }
 
 /* Free the current process's resources. */

@@ -32,6 +32,9 @@ struct file_fd
    struct list_elem fd_elem;
 };
 
+#define FDT_PAGES 3
+#define FDCOUNT_LIMIT FDT_PAGES * (1 << 9)
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
