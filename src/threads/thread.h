@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 
+#include "threads/synch.h"
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -120,6 +122,9 @@ struct thread
 
     int stdin_cnt;
     int stdout_cnt;
+
+    struct semaphore wait_sema;
+    struct semaphore free_sema;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
