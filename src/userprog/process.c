@@ -171,7 +171,7 @@ int process_wait(tid_t child_tid UNUSED)
 struct thread *get_child_process(int pid) 
 {
   struct thread *thr = thread_current();
-  struct list *child_list = &thr->children_list;
+  struct list *child_list = &thr->children;
   struct list_elem *thr_child = list_begin(child_list);
 
   while (thr_child != list_end(child_list)) 
