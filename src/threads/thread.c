@@ -183,6 +183,20 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  /* Parent and Child */
+  struct thread *thr = thread_current();
+  lsit_push_back(&thr->children, &t->children_elem);
+
+  /* File Descriptor */
+  t->fd_list = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+  if(t->fd_list == NULL)
+    return TID_ERROR;
+  t->file_cnt = 2; //STDIN, OUT
+  t->fd_list[0] = 1;
+  t->fd_list[1] = 2;
+  t->stdin_cnt = 1;
+  t->stdout_cnt = 1;
+
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
