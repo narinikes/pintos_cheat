@@ -115,31 +115,31 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_WAIT:
       get_argv(f->esp, argv, 1);
-      f->R.rax = sys_wait(argv[0]);
+      f->eax = sys_wait(argv[0]);
       break;
     case SYS_CREATE:
       get_argv(f->esp, argv, 2);
-      f->R.rax = sys_create(argv[0], argv[1]);
+      f->eax = sys_create(argv[0], argv[1]);
       break;
     case SYS_REMOVE:
       get_argv(f->esp, argv, 1);
-      f->R.rax = sys_remove(argv[0]);
+      f->eax = sys_remove(argv[0]);
       break;
     case SYS_OPEN:
       get_argv(f->esp, argv, 1);
-      f->R.rax = sys_open(argv[0]);
+      f->eax = sys_open(argv[0]);
       break;
     case SYS_FILESIZE:
       get_argv(f->esp, argv, 1);
-      f->R.rax = sys_filesize(argv[0]);
+      f->eax = sys_filesize(argv[0]);
       break;
     case SYS_READ:
       get_argv(f->esp, argv, 3);
-      f->R.rax = sys_read(argv[0], argv[1], argv[2]);
+      f->eax = sys_read(argv[0], argv[1], argv[2]);
       break;
     case SYS_WRITE:
       get_argv(f->esp, argv, 3);
-      f->R.rax = sys_write(argv[0], argv[1], argv[2]);
+      f->eax = sys_write(argv[0], argv[1], argv[2]);
       break;
     case SYS_SEEK:
       get_argv(f->esp, argv, 2);
@@ -147,7 +147,7 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_TELL:
       get_argv(f->esp, argv, 1);
-      f->R.rax = sys_tell(argv[0]);
+      f->eax = sys_tell(argv[0]);
     case SYS_CLOSE:
       get_argv(f->esp, argv, 1);
       sys_close(argv[0]);
@@ -202,7 +202,7 @@ bool sys_remove(const char *file)
   if(!check_address(file) || !file)
     sys_exit(-1);
   result = filesys_remove(file);
-  return result
+  return result;
 }
 
 int sys_open(const char *file)
@@ -315,7 +315,7 @@ unsigned sys_tell(int fd)
   struct file *target = find_f(fd);
   if(!target || target <= 2) //STDIN or STDOUT
     return -1;
-  return file_tell(target)
+  return file_tell(target);
 }
 
 void sys_close(int fd)

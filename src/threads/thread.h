@@ -125,6 +125,7 @@ struct thread
 
     struct semaphore wait_sema;
     struct semaphore free_sema;
+    struct semaphore load_thr;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
