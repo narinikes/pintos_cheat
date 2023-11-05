@@ -156,7 +156,7 @@ start_process(void *file_name_)
    does nothing. */
 int process_wait(tid_t child_tid UNUSED)
 {
-  struct thread *child = get_child_with_pid(child_tid);
+  struct thread *child = get_child_process(child_tid);
   if(child == NULL)
     return -1;
   sema_down(&child->wait_sema);
@@ -168,14 +168,17 @@ int process_wait(tid_t child_tid UNUSED)
 }
 
 /* Get child process */
-struct thread *get_child_process(int pid) {
+struct thread *get_child_process(int pid) 
+{
   struct thread *thr = thread_current();
   struct list *child_list = &thr->children_list;
   struct list_elem *thr_child = list_begin(child_list);
 
-  while (thr_child != list_end(child_list)) {
+  while (thr_child != list_end(child_list)) 
+  {
     struct thread *cur_t = list_entry(thr_child, struct thread, child_elem);
-    if (cur_t->tid == pid) {
+    if (cur_t->tid == pid) 
+    {
       return cur_t;
     }
     thr_child = list_next(thr_child);
