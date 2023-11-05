@@ -185,7 +185,7 @@ thread_create (const char *name, int priority,
 
   /* Parent and Child */
   struct thread *thr = thread_current();
-  lsit_push_back(&thr->children, &t->children_elem);
+  list_push_back(&thr->children, &t->children_elem);
 
   /* File Descriptor */
   t->fd_list = palloc_get_page(PAL_ZERO);
