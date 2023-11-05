@@ -31,7 +31,6 @@ void sys_close(int fd);
 
 /* Helping functions for system call handler */
 bool check_address(void *address);
-void get_argv(int *esp, int *argv, int cnt);
 
 /* Functions for handling fd */
 static struct file *find_f(int fd);
@@ -43,18 +42,6 @@ bool check_address(void *address)
   if(address < 0xc0000000 && address >= 0x8048000 && address != NULL)
     return true;
   return false;
-}
-
-void get_arv(int *esp, int *argv, int cnt)
-{
-  int i = 0;
-  for(i = 0; i < cnt; i++)
-  {
-    if(check_address(esp+1+i))
-      argv[i] = *(esp+1+i);
-    else
-      sys_exit(-1);
-  }
 }
 
 static struct file *find_f(int fd)
@@ -96,7 +83,6 @@ static void
 syscall_handler (struct intr_frame *f) 
 {
   printf ("system call!\n");
-  int argv[3];
   if(!check_address(f->esp))
     sys_exit(-1);
   switch(*(int *)f->esp)
@@ -105,53 +91,41 @@ syscall_handler (struct intr_frame *f)
       sys_halt();
       break;
     case SYS_EXIT:
-      get_argv(f->esp, argv, 1);
-      sys_exit(argv[0]);
+      sys_exit(f->edi);
       break;
     case SYS_EXEC:
-      get_argv(f->esp, argv, 1);
-      if(sys_exec(argv[0]) == -1)
+      if(sys_exec((f->edi) == -1))
         sys_exit(-1);
       break;
     case SYS_WAIT:
-      get_argv(f->esp, argv, 1);
-      f->eax = sys_wait(argv[0]);
+      f->eax = sys_wait(f->edi);
       break;
     case SYS_CREATE:
-      get_argv(f->esp, argv, 2);
-      f->eax = sys_create(argv[0], argv[1]);
+      f->eax = sys_create(f->edi, f->esi);
       break;
     case SYS_REMOVE:
-      get_argv(f->esp, argv, 1);
-      f->eax = sys_remove(argv[0]);
+      f->eax = sys_remove(f->edi);
       break;
     case SYS_OPEN:
-      get_argv(f->esp, argv, 1);
-      f->eax = sys_open(argv[0]);
+      f->eax = sys_open(f->edi);
       break;
     case SYS_FILESIZE:
-      get_argv(f->esp, argv, 1);
-      f->eax = sys_filesize(argv[0]);
+      f->eax = sys_filesize(f->edi);
       break;
     case SYS_READ:
-      get_argv(f->esp, argv, 3);
-      f->eax = sys_read(argv[0], argv[1], argv[2]);
+      f->eax = sys_read(f->edi, f->esi, f->edx);
       break;
     case SYS_WRITE:
-      get_argv(f->esp, argv, 3);
-      f->eax = sys_write(argv[0], argv[1], argv[2]);
+      f->eax = sys_write(f->edi, f->esi, f->edx);
       break;
     case SYS_SEEK:
-      get_argv(f->esp, argv, 2);
-      sys_seek(argv[0], argv[1]);
+      sys_seek(f->edi, f->esi);
       break;
     case SYS_TELL:
-      get_argv(f->esp, argv, 1);
-      f->eax = sys_tell(argv[0]);
+      f->eax = sys_tell(f->edi);
       break;
     case SYS_CLOSE:
-      get_argv(f->esp, argv, 1);
-      sys_close(argv[0]);
+      sys_close(f->edi);
       break;
     default:
       sys_exit(-1);
