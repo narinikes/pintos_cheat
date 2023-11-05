@@ -148,6 +148,7 @@ syscall_handler (struct intr_frame *f)
     case SYS_TELL:
       get_argv(f->esp, argv, 1);
       f->eax = sys_tell(argv[0]);
+      break;
     case SYS_CLOSE:
       get_argv(f->esp, argv, 1);
       sys_close(argv[0]);
