@@ -88,7 +88,6 @@ start_process (void *file_name_)
     insert_stack (argset, arg_num, &if_.esp);
   
   palloc_free_page (argset);
-  sema_up (&thread_current()->parent->load_lock);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
