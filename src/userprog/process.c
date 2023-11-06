@@ -262,10 +262,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-<<<<<<< HEAD
-=======
-  t->pcb->file_ex = file;
->>>>>>> 255f498de4980cdaa89d2c62dc09c4739533f783
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
