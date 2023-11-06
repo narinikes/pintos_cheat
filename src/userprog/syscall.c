@@ -3,309 +3,309 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "threads/vaddr.h"
-#include "threads/synch.h"
+
 #include "filesys/filesys.h"
 #include "filesys/file.h"
-#include "filesys/off_t.h"
-#include "devices/block.h"
+#include "userprog/process.h"
+#include "threads/synch.h"
 
-/* These are defined in threads/thread.c */
-/*
-extern struct list opened_file_list;
-extern int file_open_count;
-*/
+static void syscall_handler (struct intr_frame *);
 
-// struct lock file_lock; // original is in thread.c
+struct lock file_rw_lock;
+typedef int pid_t;
 
-struct file *getfile (int fd);
-static void syscall_handler (struct intr_frame *f);
-void check_user_vaddr (const void *vaddr);
+/* Functions for each system call */
+void sys_halt(void);
+void sys_exit(int status);
+int sys_exec(const char *cmd_line);
+int sys_wait(pid_t pid);
+bool sys_create(const char *file, unsigned initial_size);
+bool sys_remove(const char *file);
+int sys_open(const char *file);
+int sys_filesize(int fd);
+int sys_read(int fd, void *buffer, unsigned size);
+int sys_write(int fd, const void *buffer, unsigned size);
+void sys_seek(int fd, unsigned position);
+unsigned sys_tell(int fd);
+void sys_close(int fd);
+
+/* Helping functions for system call handler */
+bool check_address(void *address);
+
+/* Functions for handling fd */
+static struct file *find_f(int fd);
+int add_f(struct file *file);
+void remove_f(int fd);
+
+bool check_address(void *address)
+{
+  if(address < 0xc0000000 && address >= 0x8048000 && address != NULL)
+    return true;
+  return false;
+}
+
+static struct file *find_f(int fd)
+{
+  struct thread *thr = thread_current();
+  if(fd < 0 || fd >= FDCOUNT_LIMIT)
+    return NULL;
+  return thr->fd_list[fd];
+}
+
+int add_f(struct file *file)
+{
+  struct thread *thr = thread_current();
+  struct file **fdl = thr->fd_list;
+  while(thr->file_cnt < FDCOUNT_LIMIT && fdl[thr->file_cnt])
+    thr->file_cnt++;
+  if(thr->file_cnt >= FDCOUNT_LIMIT)
+    return -1;
+  fdl[thr->file_cnt] = file;
+  return thr->file_cnt;
+}
+
+void remove_f(int fd)
+{
+  struct thread *thr = thread_current();
+  if(fd < 0 || fd >= FDCOUNT_LIMIT)
+    return;
+  thr->fd_list[fd] = NULL;
+}
 
 void
 syscall_init (void) 
 {
-  // lock_init (&file_lock);
-//printf("syscall_init START!\n");
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-//printf("syscall_init END!\n");
+  lock_init(&file_rw_lock);
 }
 
-void
+static void
 syscall_handler (struct intr_frame *f) 
 {
-  /*
-    인자가 1개인 녀석은 esp + 4 부터 시작하고, 2개 이상은 녀석은 esp + 20 부터 시작한다.
-    리턴값이 있는 함수는, 그 리턴값을 eax에 넣어주어야 한다. (docs p.36)
-  */
-//printf ("system call!\n");
-//printf("syscall: %d\n", *(uint32_t *)(f->esp));
-//hex_dump (f->esp, f->esp, 100, 1);
-  void *sp = f->esp;
-
-  switch (*(uint32_t *)sp)
+  printf ("system call!\n");
+  if(!check_address(f->esp))
+    sys_exit(-1);
+  switch(*(int *)f->esp)
   {
-    case SYS_HALT:                   // args number: 0
-      halt ();
+    case SYS_HALT:
+      sys_halt();
       break;
-
-    case SYS_EXIT:                   // args number: 1
-      check_user_vaddr (sp + 4);
-      exit( *(uint32_t *)(sp + 4) );
+    case SYS_EXIT:
+      sys_exit(f->edi);
       break;
-
-    case SYS_EXEC:                   // args number: 1
-      check_user_vaddr (sp + 4);
-      f->eax = exec ( (const char *)*(uint32_t *)(sp + 4) );
+    case SYS_EXEC:
+      if(sys_exec((f->edi) == -1))
+        sys_exit(-1);
       break;
-
-    case SYS_WAIT:                   // args number: 1
-      check_user_vaddr (sp + 4);
-      f->eax = wait ( (pid_t *)*(uint32_t *)(sp + 4) );
+    case SYS_WAIT:
+      f->eax = sys_wait(f->edi);
       break;
-
-    case SYS_CREATE:                 // args number: 2
-      check_user_vaddr (sp + 4);
-      f->eax = create ( (const char *)*(uint32_t *)(sp + 4),  (const char *)*(uint32_t *)(sp + 8) );
+    case SYS_CREATE:
+      f->eax = sys_create(f->edi, f->esi);
       break;
-
-    case SYS_REMOVE:                 // args number: 1
-      check_user_vaddr (sp + 4);
-      f->eax = remove ( (const char *)*(uint32_t *)(sp + 4) );
+    case SYS_REMOVE:
+      f->eax = sys_remove(f->edi);
       break;
-
-    case SYS_OPEN:                   // args number: 1
-      check_user_vaddr (sp + 4);
-      f->eax = open ( (const char *)*(uint32_t *)(sp + 4) );
+    case SYS_OPEN:
+      f->eax = sys_open(f->edi);
       break;
-
-    case SYS_FILESIZE:               // args number: 1
-      check_user_vaddr (sp + 4);
-      f->eax = filesize ( (int)*(uint32_t *)(sp + 4) );
+    case SYS_FILESIZE:
+      f->eax = sys_filesize(f->edi);
       break;
-
-    case SYS_READ:                   // args number: 3
-      check_user_vaddr (sp + 4);
-      f->eax = read ( (int)*(uint32_t *)(sp + 4), (void *)*(uint32_t *)(sp + 8), (unsigned)*((uint32_t *)(sp + 12)) );
+    case SYS_READ:
+      f->eax = sys_read(f->edi, f->esi, f->edx);
       break;
-
-    case SYS_WRITE:                  // args number: 3
-      check_user_vaddr (sp + 4);
-      f->eax = write( (int)*(uint32_t *)(sp + 4), (void *)*(uint32_t *)(sp + 8), (unsigned)*((uint32_t *)(sp + 12)) );
+    case SYS_WRITE:
+      f->eax = sys_write(f->edi, f->esi, f->edx);
       break;
-
-    case SYS_SEEK:                   // args number: 2
-      check_user_vaddr (sp + 4);
-      seek ( (int)*(uint32_t *)(sp + 4), (unsigned)*((uint32_t *)(sp + 8)) );
+    case SYS_SEEK:
+      sys_seek(f->edi, f->esi);
       break;
-
-    case SYS_TELL:                   // args number: 1
-      check_user_vaddr (sp + 4);
-      f->eax = tell ( (int)*(uint32_t *)(sp + 4) );
+    case SYS_TELL:
+      f->eax = sys_tell(f->edi);
       break;
-
-    case SYS_CLOSE:                  // args number: 1
-      check_user_vaddr (sp + 4);
-      close ( (int)*(uint32_t *)(sp + 4) );
+    case SYS_CLOSE:
+      sys_close(f->edi);
+      break;
+    default:
+      sys_exit(-1);
       break;
   }
-  // thread_exit ();
+  
+  thread_exit ();
 }
 
-void
-halt (void)
+void sys_halt(void)
 {
-  shutdown_power_off ();
+  shutdown_power_off();
 }
 
-void
-exit (int status)
+void sys_exit(int status)
 {
-  printf("%s: exit(%d)\n", thread_name(), status);
-  // thread_current() -> status = THREAD_DYING; /* 이는 thread_exit() 내에서 처리됨 */
-  thread_current() -> exit_code = status;
-  for (int i=3; i<128; i++) 
-  {
-    if (getfile(i) != NULL)
-      close(i);
-  }
+  struct thread *thr = thread_current();
+  thr->exit_state = status;
+
+  if(thr->thr_load)
+    sema_up(&(thr->load_thr));
+
+  printf("%s: exit(%d)\n", thr->name, status);
   thread_exit();
 }
 
-pid_t
-exec (const char *cmd_line)
+int sys_exec(const char *cmd_line)
 {
-  return process_execute (cmd_line);
+  return process_execute(cmd_line);
 }
 
-int
-wait (pid_t pid)
+int sys_wait(int pid)
 {
-//printf(" SYSCALL: wait \n");
-  return process_wait (pid);
+  return process_wait(pid); //process wait도 수정할 것
 }
 
-bool
-create(const char *file, unsigned initial_size)
+bool sys_create(const char *file, unsigned initial_size)
 {
-  if (file == NULL)
-    exit(-1);
-  return filesys_create (file, initial_size);
+  bool result = false;
+  if(!check_address(file) || !file)
+    sys_exit(-1);
+  result = filesys_create(file, initial_size);
+  return result;
 }
 
-bool
-remove (const char *file)
+bool sys_remove(const char *file)
 {
-  if (file == NULL)
-    exit(-1);
-  return filesys_remove (file);
+  bool result = false;
+  if(!check_address(file) || !file)
+    sys_exit(-1);
+  result = filesys_remove(file);
+  return result;
 }
 
-int
-open (const char *file)
+int sys_open(const char *file)
 {
-//printf(" SYSCALL: open \n");
-  if (file == NULL)
-    exit(-1);
-  check_user_vaddr (file);
-  // lock_acquire (&file_lock);
-  struct file *return_file = filesys_open (file);
-  if (return_file == NULL)
+  if(!check_address(file) || !file)
+    sys_exit(-1);
+  struct file *opened_file = filesys_open(file);
+  if(!opened_file)
     return -1;
-  else
-  {
-    for (int i=3; i<128; i++)
-    {
-      if (getfile(i) == NULL)
-      {
-        if (strcmp (thread_current()->name, file) == false)
-          file_deny_write (return_file);
-
-        thread_current()->fd[i] = return_file;
-//printf("  >> filesys_open(file) success, return %d, idx of fd", i);
-        // lock_release (&file_lock);
-        return i;
-      }
-    }
-//printf("  >> filesys_open(file) failed ; thread's fd is full, return -1\n");
-  }
-  // lock_release (&file_lock);
-  return -1;
+  int fd = add_f(opened_file);
+  if(fd == -1)
+    file_close(opened_file);
+  return fd;
 }
 
-int
-filesize (int fd)
+int sys_filesize(int fd)
 {
-  struct file *f = getfile (fd);
-  if (f == NULL)
-    exit(-1);
-  else
-    return file_length (f);
+  struct file *target = find_f(fd);
+  if(!target)
+    return -1;
+  return file_length(target);
 }
 
-int
-read (int fd, void *buffer, unsigned size)
+int sys_read(int fd, void *buffer, unsigned size)
 {
-  check_user_vaddr (buffer);
-  // lock_acquire (&file_lock);
-  if (fd == 0)
+  if(!check_address(buffer))
+    sys_exit(-1);
+  int ret;
+  struct thread *thr = thread_current();
+  struct file *target = find_f(fd);
+  if(!target)
+    return -1;
+  if(target == 1) //STDIN
   {
-    /* input_getc() 를 이용해 키보드 입력을 버퍼에 넣는다. 그리고 입력된 사이즈(bytes)를 리턴한다. */
-    int i;
-    for (i=0; i<size; i++)
+    if(thr->stdin_cnt == 0)
     {
-      if ( ( (char *)buffer)[i] == '\0')
-        break;
+      NOT_REACHED();
+      remove_f(fd);
+      ret = -1;
     }
-    // lock_release (&file_lock);
-    return i;
-  }
-  else
-  {
-    struct file *f = getfile (fd);
-    if (f == NULL)
-      exit(-1);
     else
     {
-      // lock_release (&file_lock);
-      return file_read (f, buffer, size);
+      int i;
+      unsigned char * buf = buffer;
+      for(i = 0; i < size; i++)
+      {
+        char c = input_getc();
+        *buf++ = c;
+        if(c == '\0') //end
+          break;
+      }
+      ret = i;
     }
   }
-}
-
-
-int
-write (int fd, const void *buffer, unsigned size) // 이거 내용 부정확하니까 docs 보고 다시 짜기!!
-{
-  check_user_vaddr (buffer);
-  // lock_acquire (&file_lock);
-  if (fd == 1)
-  {
-    /* putbuf() 함수를 이용하여 버퍼의 내용을 콘솔에 입력한다. 이 때에는 필요한 사이즈만큼 반복문을 돌아야 한다. */
-    putbuf (buffer, size);
-    return size;
-  }
+  else if(target == 2) //STDOUT
+    ret = -1;
   else
   {
-    struct file *f = getfile (fd);
-    if (f == NULL)
+    lock_acquire(&file_rw_lock);
+    ret = file_read(target, buffer, size);
+    lock_release(&file_rw_lock);
+  }
+  return ret;
+}
+
+int sys_write(int fd, const void *buffer, unsigned size)
+{
+  if(!check_address(buffer))
+    sys_exit(-1);
+  int ret;
+  struct file *target = find_f(fd);
+  if(!target)
+    return -1;
+  struct thread *thr = thread_current();
+  if(target == 1) //STDIN
+    ret = -1;
+  else if(target == 2) // STDOUT
+  {
+    if(thr->stdout_cnt == 0)
     {
-      // lock_release (&file_lock);
-      exit(-1);
+      NOT_REACHED();
+      remove_f(fd);
+      ret = -1;
     }
-    if (f->deny_write)
+    else
     {
-      file_deny_write (f);
+      putbuf(buffer, size);
+      ret = size;
     }
-    // lock_release (&file_lock);
-    return file_write (f, buffer, size);
   }
-}
-
-void
-seek (int fd, unsigned position)
-{
-  struct file *f = getfile (fd);
-  if (f == NULL)
-    exit(-1);
-  else
-    return file_seek (f, position);
-}
-
-unsigned
-tell (int fd)
-{
-  struct file *f = getfile (fd);
-  if (f == NULL)
-    exit(-1);
-  else
-    return file_tell (f);
-}
-
-void
-close (int fd)
-{
-  struct file *f = getfile (fd);
-  if (f == NULL)
-    exit(-1);
   else
   {
-    f = NULL;
-    file_close (f);
+    lock_acquire(&file_rw_lock);
+    ret = file_write(target, buffer, size);
+    lock_release(&file_rw_lock);
   }
+  return ret;
 }
 
-struct file
-*getfile (int fd)
+void sys_seek(int fd, unsigned position)
 {
-  return (thread_current()->fd[fd]);
+  struct file *target = find_f(fd);
+  if(!target || target <= 2) //STDIN or STDOUT
+    return;
+  file_seek(target, position);
 }
 
-void
-check_user_vaddr (const void *vaddr)
+unsigned sys_tell(int fd)
 {
-  // ASSERT(is_user_vaddr(vaddr)); 
-  // 이거 ASSERT로 하면 프로세스가 -1로 종료되지 않아서 테스트케이스 통과 안함
-  if (!is_user_vaddr (vaddr))
-    exit(-1);
+  struct file *target = find_f(fd);
+  if(!target || target <= 2) //STDIN or STDOUT
+    return -1;
+  return file_tell(target);
+}
+
+void sys_close(int fd)
+{
+  struct file *target = find_f(fd);
+  if(!target)
+    return;
+  struct thread *thr = thread_current();
+  if(fd == 0 || target == 1)
+    thr->stdin_cnt--;
+  else if(fd == 1 || target == 2)
+    thr->stdout_cnt--;
+
+  remove_f(fd);
+  if(fd <= 1 || fd <= 2)
+    return;
+  file_close(target);
 }

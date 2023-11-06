@@ -35,13 +35,7 @@ static struct thread *idle_thread;
 static struct thread *initial_thread;
 
 /* Lock used by allocate_tid(). */
-struct lock tid_lock;
-
-/*
-#ifdef USERPROG
-struct lock file_lock; // MYCODE
-#endif
-*/
+static struct lock tid_lock;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
@@ -188,6 +182,20 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+
+  /* Parent and Child */
+  struct thread *thr = thread_current();
+  list_push_back(&thr->children, &t->children_elem);
+
+  /* File Descriptor */
+  t->fd_list = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+  if(t->fd_list == NULL)
+    return TID_ERROR;
+  t->file_cnt = 2; //STDIN, OUT
+  t->fd_list[0] = 1;
+  t->fd_list[1] = 2;
+  t->stdin_cnt = 1;
+  t->stdout_cnt = 1;
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -473,20 +481,6 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
-
-// MYCODE_START
-#ifdef USERPROG
-  for (int i=0; i<128; i++)
-    t->fd[i] = NULL;
-  t->parent = running_thread();
-  sema_init (&t->child_lock, 0);
-  sema_init (&t->memory_lock, 0);
-  sema_init (&t->load_lock, 0);
-  list_init (&(t->children));
-  list_push_back (&(running_thread()->children), &(t->child_elem));
-
-#endif
-// MYCODE_END
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

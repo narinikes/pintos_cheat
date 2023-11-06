@@ -52,22 +52,11 @@ process_execute (const char *file_name)
   token = strtok_r(token, " ", &dummyptr); // 여기에 &save_ptr 대신 NULL을 넣어도 무방함. save_ptr은 이후 안쓰임. 함 해보까?
   // >> 여기에 NULL 넣어줬더니 kernel PANIC 떠서 dummyptr 해줌.
 
-  struct thread *current = thread_current();
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
 
-  sema_down (&current->load_lock);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy); 
     return -1;
-  }
-  
-  struct list_elem* iter = NULL;
-  struct thread *elem = NULL;
-  for (iter = list_begin(&(current->children)); iter != list_end(&(current->children)); iter = list_next(iter))
-  {
-    elem = list_entry (iter, struct thread, child_elem);
-    if (elem->exit_code == -1)
-      return process_wait (tid);
   }
 
   palloc_free_page (token);
@@ -128,76 +117,37 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
-int
-process_wait (tid_t child_tid) 
+int process_wait(tid_t child_tid UNUSED)
 {
-  // MYCODE_START
-//printf("  >> invoking process_wait () !\n");
-  struct thread *current = thread_current();
-  struct list_elem* iter = NULL;
-  struct thread *elem = NULL;
-  int return_value;
-      /*
-      이를 구현하기 위해, 현재 프로세스(스레드)는 "thread/synch.h"에 정의된
-      void cond_wait (struct condition *, struct lock *)를 통해 자식프로세스의 종료를 기다리고,
-      반대로 자식프로세스는 void cond_signal (struct condition *, struct lock *)
-      를 통해 종료를 알리게 한다.
-       --> 세마포어로 구현함
-      */
-/*
-  if (child->tid != child_tid)
-  {
-//printf("  >> this pid is not a direct child of current process! return -1\n");
+  struct thread *child = get_child_process(child_tid);
+  if(child == NULL)
     return -1;
-  }
-  else
-  {
-    if (child->status == THREAD_DYING)
-    {
-//printf("  >> this pid was terminated by KERNEL!\n");
-// or
-//printf("  >> this pid was already terminated by parent!\n");
-      return -1;
-    }
-    else if (child->status == THREAD_BLOCKED) // 이거 조건 부정확함!!!!!!
-    {
-//printf("  >> this pid is already waited!\n");
-      return -1;
-    }
-    else // SUCCESS*/
-    
-  for (iter = list_begin(&(current->children)); iter != list_end(&(current->children)); iter = list_next(iter))
-  {
-    elem = list_entry (iter, struct thread, child_elem);
-    if (elem->tid == child_tid)
-    {
-      sema_down (&(elem->child_lock));
-      return_value = elem->exit_code;
-      list_remove (&(elem->child_elem));
-      sema_up (&(elem->memory_lock));
-      return return_value;
-    }
-  }
-  return -1;
+  sema_down(&child->wait_sema);
 
-/* // 스레드가 직속 자식만 포인트할 때
-  sema_down (&(child->child_lock)); // wait
-  int exit_code = child->exit_code;
-  child->child = NULL; // remove
-  sema_up (&(child->memory_lock)); // send signal to the parent
-  return exit_code;
-*/
-    // MYCODE_END
+  int exit_state = child->exit_state;
+  list_remove(&child->children_elem);
+  sema_up(&child->free_sema);
+  return exit_state;
 }
-  
-  /*
-  int i=0;
-  int j=0;
-  for (i=0; i<1000000000; i++)
-    j ++;
 
-  return -1;
-  */
+/* Get child process */
+struct thread *get_child_process(int pid) 
+{
+  struct thread *thr = thread_current();
+  struct list *child_list = &thr->children;
+  struct list_elem *thr_child = list_begin(child_list);
+
+  while (thr_child != list_end(child_list)) 
+  {
+    struct thread *cur_t = list_entry(thr_child, struct thread, children_elem);
+    if (cur_t->tid == pid) 
+    {
+      return cur_t;
+    }
+    thr_child = list_next(thr_child);
+  }
+  return NULL;
+}
 
 
 /* Free the current process's resources. */
@@ -223,10 +173,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-    // MYCODE_START
-    sema_up (&(cur->child_lock));
-    sema_down (&(cur->memory_lock));
-    // MYCODE_END
 //printf("    >> process_exit() complete\n!");
 }
 

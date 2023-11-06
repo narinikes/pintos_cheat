@@ -4,8 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+
 #include "threads/synch.h"
-#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -25,6 +25,17 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+/* file descriptor */
+struct file_fd
+{
+   int fd;
+   struct file *f;
+   struct list_elem fd_elem;
+};
+
+#define FDT_PAGES 3
+#define FDCOUNT_LIMIT FDT_PAGES * (1 << 9)
 
 /* A kernel thread or user process.
 
@@ -95,27 +106,30 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    /* For syscall */
+    int file_cnt;
+    struct file **fd_list;
+
+    int exit_state;
+
+    bool thr_exit;
+    bool thr_load;
+
+    struct thread *parent;
+    struct list children;
+    struct list_elem children_elem;
+    struct file *current_file;
+
+    int stdin_cnt;
+    int stdout_cnt;
+
+    struct semaphore wait_sema;
+    struct semaphore free_sema;
+    struct semaphore load_thr;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    // MYCODE_START
-    struct thread *parent;              /* Parent thread. */
-    /* 기존에는 직속 자식스레드만 포인트하도록 했으나, 이를 리스트로 변경하여 모든 자식의자식의... 를 리스트로 갖도록함 */
-    struct list children;               
-    struct list_elem child_elem; 
-
-    struct semaphore child_lock;
-    struct semaphore memory_lock;
-    struct semaphore load_lock;
-
-    int exit_code;
-    struct file *fd[128];
-    /*
-      fd를 file의 포인터로 선언하고 각 fd를 배열의 인덱스로 접근하는 방식은
-      블로그를 참조하였다.
-      fd[0], fd[1], fd[2] 는 각각 stdin, stdout, stderr 이란다.
-    */
-    // MYCODE_END
 #endif
 
     /* Owned by thread.c. */
