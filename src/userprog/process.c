@@ -47,21 +47,19 @@ process_execute (const char *file_name)
   // PLAN
   // file_name 의 첫 인자가 진짜 file name 이다.
   char* dummyptr;
-  char *token = malloc(strlen(fn_copy) + 1);
-  strlcpy(token, fn_copy, strlen(fn_copy)+1);
+  char *token = palloc_get_page (0);
+  strlcpy(token, fn_copy, PGSIZE);
   token = strtok_r(token, " ", &dummyptr); // 여기에 &save_ptr 대신 NULL을 넣어도 무방함. save_ptr은 이후 안쓰임. 함 해보까?
   // >> 여기에 NULL 넣어줬더니 kernel PANIC 떠서 dummyptr 해줌.
 
   struct thread *current = thread_current();
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
-  free(token);
 
   sema_down (&current->load_lock);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy); 
     return -1;
   }
-    
   
   struct list_elem* iter = NULL;
   struct thread *elem = NULL;
@@ -71,6 +69,8 @@ process_execute (const char *file_name)
     if (elem->exit_code == -1)
       return process_wait (tid);
   }
+
+  palloc_free_page (token);
   return tid;
 }
 
@@ -79,19 +79,31 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
+//printf(" >> start_process() start!\n");
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
-  if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
+  if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG; // User data selector(뭔가 단위인듯)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+
+  char **argset = palloc_get_page(0);
+  int arg_num = arguments_pars(file_name, argset);
+
+  success = load (argv[0], &if_.eip, &if_.esp);
+
+  if (success)
+    insert_stack (argset, arg_num, &if_.esp);
+  
+  palloc_free_page (argset);
+  sema_up (&thread_current()->parent->load_lock);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+  
   if (!success) 
     thread_exit ();
 
@@ -101,7 +113,9 @@ start_process (void *file_name_)
      arguments on the stack in the form of a `struct intr_frame',
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
+//printf(" >> in start_process(), invoking asm volatile()... \n");
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
+//printf(" >> in start_process(), asm volatile() finished! \n ");
   NOT_REACHED ();
 }
 
