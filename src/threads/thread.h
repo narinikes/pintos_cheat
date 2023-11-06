@@ -4,8 +4,6 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include "threads/fixed_point.h"
-#include "synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -25,25 +23,6 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
-#define CPU_RECENT_DEFAULT 0
-#define NICENESS_DEFAULT 0
-#define LOAD_AVG_DEFAULT 0
-
-
-struct pcb
-  {
-    int num_exit;
-    bool exited;
-    bool loaded;
-
-    struct file **fd_table;
-    int fd_cnt;
-    struct file *file_ex;
-
-    struct semaphore semaphore_wait;
-    struct semaphore semaphore_load;
-  };
 
 /* A kernel thread or user process.
 
@@ -110,24 +89,13 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-    int64_t wake;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    int start_priority;
-    struct list donation_list;
-    struct list_elem elem_donation;
-    struct lock *wait_for_release;
-    fixed_point cpu_recent;
-    int niceness;
-     
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;
-    struct pcb *pcb;                    /* PCB. */
-
-    struct thread *parent;
-    struct list list_child;
-    struct list_elem elem_child;       
+    uint32_t *pagedir;                  /* Page directory. */
 #endif
 
     /* Owned by thread.c. */
@@ -141,8 +109,7 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 void thread_start (void);
-void thread_sleep(int64_t ticks);
-void thread_wake(int64_t ticks);
+
 void thread_tick (void);
 void thread_print_stats (void);
 
@@ -171,27 +138,4 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-// For Priority Scheduling
-bool thread_cmp_priority (const struct list_elem *thread1, const struct list_elem *thread2, void *aux UNUSED);
-void thread_compare_first(void);
-
-// For priority donation
-void priority_donate(void);
-bool cmp_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-void delete_donation(struct lock *lock);
-void update_priority (void);
-
-// For MLFQS Advanced Scheduling
-void mlfqs_compute_priority(struct thread *t); // Compute the priority of thread
-// void mlfqs_compute_recent_cpu(struct thread *t); // Compute the recent_cpu value of thread
-void mlfqs_calculate_load_avg(void); // Compute the load_avg value for global variable
-
-void mlfqs_increase_recent_cpu(void); // Increment the value of recent_cpu of running thread by 1
-void mlfqs_recompute_recent_cpu(void); // Recompute the recent_cpu value for all threads every 4 ticks
-void mlfqs_recompute_priority(void); // Recompute the priority of all threads every second
-/* for project 2*/
-struct pcb *get_child_pcb (tid_t child_tid);
-struct thread *get_child_thread (tid_t child_tid);
-
 #endif /* threads/thread.h */
-
