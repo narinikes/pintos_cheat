@@ -44,7 +44,7 @@ Implement the system call handler
 struct file 
   {
     struct inode *inode;        /* File's inode. */
-    off_t pos;                  /* Current position. */
+    int32_t pos;                  /* Current position. */
     bool deny_write;            /* Has file_deny_write() been called? */
   };
 
