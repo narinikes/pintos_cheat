@@ -4,7 +4,6 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "threads/vaddr.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -90,7 +89,7 @@ kill (struct intr_frame *f)
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
-      thread_exit (); 
+      thread_exit (-1); 
 
     case SEL_KCSEG:
       /* Kernel's code segment, which indicates a kernel bug.
@@ -105,7 +104,7 @@ kill (struct intr_frame *f)
          kernel. */
       printf ("Interrupt %#04x (%s) in unknown segment %04x\n",
              f->vec_no, intr_name (f->vec_no), f->cs);
-      thread_exit ();
+      thread_exit (-1);
     }
 }
 
@@ -149,12 +148,11 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-
-  // ASSERT (!is_kernel_vaddr (fault_addr)); << 이렇게 하면 안됨. 아래처럼 해야함.
-  if (!user || is_kernel_vaddr (fault_addr) || not_present)
+  if(!user)
   {
-//printf(" >> in exception.c detects that user program refers to kernel area!\n");
-     exit(-1);
+    f->eip = (void (*)(void))f->eax;
+    f->eax = 0xffffffff;
+    return;
   }
 
   /* To implement virtual memory, delete the rest of the function
