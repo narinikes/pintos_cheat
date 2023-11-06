@@ -17,8 +17,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   uint32_t *sp = f->esp;
 
-  exit( *(sp + 4) );
-
   printf("%s: exit(%d)\n", thread_name(), *(sp + 4));
 
   for (int i=3; i<128; i++) 
