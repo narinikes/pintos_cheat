@@ -126,35 +126,7 @@ start_process (void *file_name_)
 //printf("    >> obtd token: %s\n", token);
 //printf("       in argc: %d\n", argc);
   argc ++;
-  while (token)
-  {
-    token = strtok_r (NULL, " ", &rest);
-//printf("    >> obtd token: %s\n", token);
-//printf("       in argc: %d\n", argc);
-    argc ++;
-  }
-  argc --;
-//printf("    >> summery argc: %d\n", argc);
-  free (cpy_file_name);
-  cpy_file_name = (char *)malloc (sizeof (file_name));
-  strlcpy (cpy_file_name, file_name, strlen(file_name) + 1);
-
-  argv = (char **)malloc(sizeof(char *) * argc);
-   
-  int i = 0;
-  token = strtok_r (cpy_file_name, " ", &rest);
-  argv[i] = token;
-//printf("      >> saved argv: %s\n", argv[i]);
-//printf("      >> i: %d\n", i);
-  i ++;
-  while (i != argc)
-  {
-    token = strtok_r (NULL, " ", &rest);
-    argv[i] = token;
-//printf("      >> saved argv: %s\n", argv[i]);
-//printf("      >> i: %d\n", i);
-    i ++;
-  }
+  
   // MYCODE_END
 //printf("    >> MYCODE_END\n");
 
