@@ -82,7 +82,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  printf ("system call!\n");
+  //printf ("system call!\n");
   if(!check_address(f->esp))
     sys_exit(-1);
   switch(*(int *)f->esp)
@@ -132,7 +132,7 @@ syscall_handler (struct intr_frame *f)
       break;
   }
   
-  thread_exit ();
+  //thread_exit ();
 }
 
 void sys_halt(void)
