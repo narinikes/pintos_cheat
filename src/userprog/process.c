@@ -617,3 +617,61 @@ install_page (void *upage, void *kpage, bool writable)
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
+
+int
+arguments_pars (char *command, char **argset)
+{
+  char *tok, *save;
+  int arg_num = 0;
+
+  for (tok = strtok_r (command, " ", &save); tok != NULL;
+  tok = strtok_r (NULL, " ", &save), arg_num++)
+  {
+    argset[arg_num] = tok;
+  }
+
+  return arg_num;
+}
+
+void
+insert_stack (char **argset, int arg_num, void **esp)
+{
+  
+  int argset_length, i, length;
+  i = arg_num -1;
+  argset_length = 0;
+  while (i >= 0){
+    length = strlen (argset[i]);
+    *esp -= length + 1;
+    argset_length += length + 1;
+    strlcpy (*esp, argset[i], length + 1);
+    argset[i] = *esp;
+    i--;
+  }
+  
+  if (argset_length % 4)
+    *esp = *esp - 4 - (argset_length % 4);
+
+  
+  *esp = *esp - 4;
+  **(uint32_t **)esp = 0;
+
+  
+  for(i = arg_num - 1; i >= 0; i--)
+  {
+    *esp = *esp - 4;
+    **(uint32_t **)esp = argset[i];
+  }
+
+  
+  *esp = *esp - 4;
+  **(uint32_t **)esp = *esp + 4;
+
+ 
+  *esp = *esp - 4;
+  **(uint32_t **)esp = arg_num;
+
+  
+  *esp = *esp - 4;
+  **(uint32_t **)esp = 0;
+}
