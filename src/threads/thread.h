@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -89,52 +90,37 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    int donated_priority;               /* Priority after donation */
-    struct list locks_held;             /* List of locks held */
-    struct lock *waiting_lock;          /* Lock the thread is waiting for */
+    struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    int64_t wake_up_time;               /* Time to wake up */
-
-    /* For communication between parent and child */
-    struct thread *parent;              /* parent thread */
-    struct list child_list;             /* list of child threads */
-
-    /* For managing files opened by thread */
-    struct list file_list;              /* list of open files */
-    struct file *own_file;              /* its own file to be closed on exit */
-    int next_fd;
-
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    // MYCODE_START
+    struct thread *parent;              /* Parent thread. */
+    /* 기존에는 직속 자식스레드만 포인트하도록 했으나, 이를 리스트로 변경하여 모든 자식의자식의... 를 리스트로 갖도록함 */
+    struct list children;               
+    struct list_elem child_elem; 
+
+    struct semaphore child_lock;
+    struct semaphore memory_lock;
+    struct semaphore load_lock;
+
+    int exit_code;
+    struct file *fd[128];
+    /*
+      fd를 file의 포인터로 선언하고 각 fd를 배열의 인덱스로 접근하는 방식은
+      블로그를 참조하였다.
+      fd[0], fd[1], fd[2] 는 각각 stdin, stdout, stderr 이란다.
+    */
+    // MYCODE_END
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
-
-
-/* struct to hold information necessary for parent about the child process */
-struct child
-{
-  tid_t tid;
-  int exit_status;
-  bool load_success;
-  bool exit;
-  struct semaphore wait_sema;
-  struct list_elem elem;
-};
-
-/* struct to manage file descriptor and representing files */
-struct file_map
-{
-  int fd;
-  struct file *file;
-  struct list_elem elem;
-};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -157,8 +143,12 @@ struct thread *thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);
 
-void thread_exit (int) NO_RETURN;
+void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+
+/* Performs some operation on thread t, given auxiliary data AUX. */
+typedef void thread_action_func (struct thread *t, void *aux);
+void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
@@ -167,16 +157,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
-void thread_update_donated_priority(struct thread*);
-bool thread_compare_wake_up (struct list_elem*, struct list_elem*, void *);
-bool thread_compare_donated_priority(struct list_elem*, struct list_elem*, void *);
-bool thread_has_max_priority(void);
-void update_ready_list(void);
-void acquire_file_lock(void);
-void release_file_lock(void);
-struct file *get_file(struct list*, int);
-struct file_map *get_file_map(struct list*, int);
-void close_files(struct list*);
 
 #endif /* threads/thread.h */
