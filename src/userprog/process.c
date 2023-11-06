@@ -77,9 +77,9 @@ process_execute (const char *file_name)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *f_name)
+start_process (void *file_name_)
 {
-  char *file_name = f_name;
+  char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
 
@@ -92,33 +92,8 @@ start_process (void *f_name)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-
-  struct thread *parent = thread_current()->parent;
-  tid_t tid = thread_current()->tid;
-  struct child *ch = NULL;
-  struct list_elem *e;
-
-  for(e = list_begin(&parent->child_list); e != list_end(&parent->child_list); e = list_next(e))
-  {
-    struct child *temp_ch = list_entry(e, struct child, elem);
-    if(temp_ch->tid == tid)
-    {
-      ch = temp_ch;
-      break;
-    }
-  }
-
   if (!success) 
-  {
-    ch->load_success = false;
-    sema_up(&ch->wait_sema);
-    thread_exit (-1);
-  }
-  else
-  {
-    ch->load_success = true;
-    sema_up(&ch->wait_sema);
-  }
+    thread_exit ();
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
