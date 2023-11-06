@@ -77,169 +77,48 @@ process_execute (const char *file_name)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (void *f_name)
 {
-//printf(" >> start_process() start!\n");
-  char *file_name = file_name_;
+  char *file_name = f_name;
   struct intr_frame if_;
   bool success;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
-  if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG; // User data selector(뭔가 단위인듯)
+  if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-
-  /*
-    여기에서 file_name parsing 하고, load의 인자인 file_name에 파일명만 넣기
-  */
-
-
-
-
-
-////////////////// strtok start ////////////////////
-// input: char *file_name
-
-//printf("    >> MYCODE_START\n");
-  // MYCODE_START
-  // using strtok_r reference: https://codeday.me/ko/qa/20190508/495336.html
-  char *rest; // to point to the rest of the string after token extraction.
-  char *token; // to point to the actual token returned.
-
-  /* init cpy_file_name for calculating argc. */
-  char *cpy_file_name = (char *)malloc (sizeof (file_name));
-  strlcpy (cpy_file_name, file_name, strlen(file_name) + 1);
-
-  /*
-  argv[0] = prog_name
-  argv[1] = 1st arg
-  argv[2] = 2nd arg
-  ...
-  */
-   
-  char **argv;
-  int argc = 0;
-  /* Get argc's length. */
-//printf("  >> Get argc's length; while loop.\n");
-  token = strtok_r (cpy_file_name, " ", &rest);
-//printf("    >> obtd token: %s\n", token);
-//printf("       in argc: %d\n", argc);
-  argc ++;
-  
-  // MYCODE_END
-//printf("    >> MYCODE_END\n");
-
-// output: char **argv, int argc
-////////////////// strtok end ////////////////////
-
-
-
-
-
-  success = load (argv[0], &if_.eip, &if_.esp);
-//printf(" >> in start_process(), load() returns true!\n");
-
-
-
-
-
-
-  if (success)
-  {
-    //  push_to_esp (&if_.esp, &file_name, &&argv, argc);
-    void **esp = &if_.esp;
-//printf(" >> push_to_esp invoked!\n");
-//printf("  >> passed argc: %d\n", argc);
-
-    /* push command line (in argv) value.
-
-        ls      -l      foo      bar
-      argv[0]   [1]     [2]      [3]
-
-      these will be pushed in right-to-left order.
-      each size is (strlen (argv[i])) + 1
-    */
-
-    int length = 0;
-//printf("  >> for loop pushing argv execute.\n");
-    for (int i = argc - 1; i >= 0; i--)
-    {
-//printf("  >> i: %d\n", i);
-      length = strlen (argv[i]) + 1; // '\n'도 넣기 위해 +1
-//printf("  >> length of argv[i]: %d\n", length);
-      *esp -= length;
-//printf("      >> extract by: %d\n", length + 1);
-      memcpy (*esp, argv[i], length);
-      // strlcpy (*esp, argv[i], length + 1);
-      argv[i] = *esp;
-    }
-
-//printf("  >> push command line finished / push word-align start\n");
-    /* push word-align. */
-    while ( (PHYS_BASE - *esp) % 4 != 0 ){
-//printf("      >> PHYS_BASE - *esp = %d\n", PHYS_BASE - *esp);
-//printf("      >> , so we extract stack %d\n", sizeof (uint8_t));
-//printf("      >> , and push 0.\n");
-      *esp -= sizeof (uint8_t);
-      **(uint8_t **)esp = 0;
-    }
-
-//printf("  >> push word-align finished / push NULL start\n");
-
-    /* push NULL */
-    *esp -= 4;
-    *(uint8_t *)*esp = 0;
-
-//printf("  >> push NULL finished / push address of argv[i] start\n");
-
-    /* push address of argv[i]. */
-    for (int i = argc - 1; i >= 0; i--)
-    {
-      *esp -= sizeof (uint32_t **);
-//printf("      >> extract by: %d\n", sizeof (uint32_t **));
-      *(uint32_t **)*esp = argv[i];
-    }
-
-//printf("  >> push address of argv[i] finished / push address of argv start\n");
-
-    /* push address of argv. */
-    *esp -= sizeof (uint32_t **);
-//printf("      >> extract by: %d\n", sizeof (uint32_t **));
-    *(uint32_t *)*esp = *esp + 4;
-
-//printf("  >> push address of argv finished / push the value of argc start\n");
-
-    /* push the value of argc. */
-    *esp -= sizeof (uint32_t);
-//printf("      >> extract by: %d\n", sizeof (uint32_t));
-    *(uint32_t *)*esp = argc;
-
-//printf("  >> push the value of argc finished / push return address start\n");
-
-    /* push return address. */
-    // 리턴어드레스의 크기는 4란다.
-    *esp -= 4;
-    *(uint32_t *)*esp = 0;
-//printf("  >> push return address finished / free(argv) start\n");
-
-// hex_dump (*esp, *esp, 100, 1);  
-    free (argv);
-    
-//printf(" >> push_to_esp end!\n");
-// MYCODE_END
-  }
-
-  free (cpy_file_name);
-
-
-
+  success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  sema_up (&thread_current()->parent->load_lock);
+
+  struct thread *parent = thread_current()->parent;
+  tid_t tid = thread_current()->tid;
+  struct child *ch = NULL;
+  struct list_elem *e;
+
+  for(e = list_begin(&parent->child_list); e != list_end(&parent->child_list); e = list_next(e))
+  {
+    struct child *temp_ch = list_entry(e, struct child, elem);
+    if(temp_ch->tid == tid)
+    {
+      ch = temp_ch;
+      break;
+    }
+  }
+
   if (!success) 
-    thread_exit ();
+  {
+    ch->load_success = false;
+    sema_up(&ch->wait_sema);
+    thread_exit (-1);
+  }
+  else
+  {
+    ch->load_success = true;
+    sema_up(&ch->wait_sema);
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -247,9 +126,7 @@ start_process (void *file_name_)
      arguments on the stack in the form of a `struct intr_frame',
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
-//printf(" >> in start_process(), invoking asm volatile()... \n");
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
-//printf(" >> in start_process(), asm volatile() finished! \n ");
   NOT_REACHED ();
 }
 
