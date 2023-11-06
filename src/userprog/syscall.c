@@ -15,6 +15,16 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
-  thread_exit ();
+  uint32_t *sp = f->esp;
+
+  exit( *(sp + 4) );
+
+  printf("%s: exit(%d)\n", thread_name(), *(sp + 4));
+
+  for (int i=3; i<128; i++) 
+  {
+    if (getfile(i) != NULL)
+      close(i);
+  }
+  thread_exit();
 }
