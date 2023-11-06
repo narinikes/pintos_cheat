@@ -93,7 +93,7 @@ start_process (void *file_name_)
   char **argset = palloc_get_page(0);
   int arg_num = arguments_pars(file_name, argset);
 
-  success = load (argv[0], &if_.eip, &if_.esp);
+  success = load (argset[0], &if_.eip, &if_.esp);
 
   if (success)
     insert_stack (argset, arg_num, &if_.esp);
