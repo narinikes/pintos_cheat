@@ -47,20 +47,21 @@ process_execute (const char *file_name)
   // PLAN
   // file_name 의 첫 인자가 진짜 file name 이다.
   char* dummyptr;
-  char* token = strtok_r(file_name, " ", &dummyptr); // 여기에 &save_ptr 대신 NULL을 넣어도 무방함. save_ptr은 이후 안쓰임. 함 해보까?
+  char *token = malloc(strlen(fn_copy) + 1);
+  strlcpy(token, fn_copy, strlen(fn_copy)+1);
+  token = strtok_r(token, " ", &dummyptr); // 여기에 &save_ptr 대신 NULL을 넣어도 무방함. save_ptr은 이후 안쓰임. 함 해보까?
   // >> 여기에 NULL 넣어줬더니 kernel PANIC 떠서 dummyptr 해줌.
-
-  // MYCODE_START
-//printf(">> in process_execute, token: %s\n", token);
-  if (filesys_open (token) == NULL)
-    return -1;
-  // MYCODE_END
 
   struct thread *current = thread_current();
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  free(token);
+
   sema_down (&current->load_lock);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy); 
+    return -1;
+  }
+    
   
   struct list_elem* iter = NULL;
   struct thread *elem = NULL;
@@ -103,15 +104,12 @@ start_process (void *file_name_)
 //printf("    >> MYCODE_START\n");
   // MYCODE_START
   // using strtok_r reference: https://codeday.me/ko/qa/20190508/495336.html
-  char *ptr; // make q point to start of file_name.
   char *rest; // to point to the rest of the string after token extraction.
   char *token; // to point to the actual token returned.
 
   /* init cpy_file_name for calculating argc. */
   char *cpy_file_name = (char *)malloc (sizeof (file_name));
   strlcpy (cpy_file_name, file_name, strlen(file_name) + 1);
-
-  ptr = cpy_file_name;
 
   /*
   argv[0] = prog_name
@@ -124,43 +122,38 @@ start_process (void *file_name_)
   int argc = 0;
   /* Get argc's length. */
 //printf("  >> Get argc's length; while loop.\n");
-  token = strtok_r (ptr, " ", &rest);
+  token = strtok_r (cpy_file_name, " ", &rest);
 //printf("    >> obtd token: %s\n", token);
 //printf("       in argc: %d\n", argc);
   argc ++;
-  ptr = rest;
-  while (token != NULL)
+  while (token)
   {
-    token = strtok_r (ptr, " ", &rest);
+    token = strtok_r (NULL, " ", &rest);
 //printf("    >> obtd token: %s\n", token);
 //printf("       in argc: %d\n", argc);
     argc ++;
-    ptr = rest;
   }
   argc --;
 //printf("    >> summery argc: %d\n", argc);
   free (cpy_file_name);
+  cpy_file_name = (char *)malloc (sizeof (file_name));
+  strlcpy (cpy_file_name, file_name, strlen(file_name) + 1);
 
   argv = (char **)malloc(sizeof(char *) * argc);
-
-  ptr = file_name;
-  // loop untill strtok_r return NULL
    
   int i = 0;
-  token = strtok_r (ptr, " ", &rest);
+  token = strtok_r (cpy_file_name, " ", &rest);
   argv[i] = token;
 //printf("      >> saved argv: %s\n", argv[i]);
 //printf("      >> i: %d\n", i);
   i ++;
-  ptr = rest;
   while (i != argc)
   {
-    token = strtok_r (ptr, " ", &rest);
+    token = strtok_r (NULL, " ", &rest);
     argv[i] = token;
 //printf("      >> saved argv: %s\n", argv[i]);
 //printf("      >> i: %d\n", i);
     i ++;
-    ptr = rest;
   }
   // MYCODE_END
 //printf("    >> MYCODE_END\n");
@@ -260,10 +253,12 @@ start_process (void *file_name_)
 
 // hex_dump (*esp, *esp, 100, 1);  
     free (argv);
+    
 //printf(" >> push_to_esp end!\n");
 // MYCODE_END
   }
 
+  free (cpy_file_name);
 
 
 
